@@ -55,17 +55,19 @@ RSpec.describe ObjectValidator do
       let(:error_msg4) { 'It is too long (more than 5 characters).' }
       let(:error_msg5) { 'It can\'t be nil.' }
       let(:error_msg6) { 'It is not an instance of String.' }
+      let(:error_msg7) { 'Custom validation (validate proc) failed.' }
 
-      it { expect(validator.errors['self'].count).to eq(6) }
+      it { expect(validator.errors['self'].count).to eq(7) }
       it { expect(validator.errors['self']).to include(error_msg1) }
       it { expect(validator.errors['self']).to include(error_msg2) }
       it { expect(validator.errors['self']).to include(error_msg3) }
       it { expect(validator.errors['self']).to include(error_msg4) }
       it { expect(validator.errors['self']).to include(error_msg5) }
       it { expect(validator.errors['self']).to include(error_msg6) }
+      it { expect(validator.errors['self']).to include(error_msg7) }
     end
 
-    context 'invalid schema' do
+    xcontext 'invalid schema' do
       wrong_schema = { type: :string, constraints: { length: { max_length: 'hello' } } }
       before(:all) { validator.send(:validate_schema!, ['self'], wrong_schema) }
       let(:error_key) { 'self.schema.constraints.length.max_length' }
@@ -128,7 +130,7 @@ RSpec.describe ObjectValidator do
       it { expect(validator.errors['self.b']).to include(error_msg_b) }
     end
 
-    context 'invalid schema (several failures)' do
+    xcontext 'invalid schema (several failures)' do
       wrong_schema = { type: :hash, constraints: { size: '1', empty: 1 }, keys: [] }
       before(:all) { validator.send(:validate_schema!, ['self'], wrong_schema) }
 
@@ -144,122 +146,64 @@ RSpec.describe ObjectValidator do
   end
 
   context '#array' do
-    context 'unordered' do
-      schema = {
-        type: :array,
-        required: true,
-        items: [
-          {
-            type: :string,
-            constraints: {
-              format: /^a.*/
-            }
-          },
-          {
-            type: :array,
-            required: true,
-            items: [
-              {
-                type: :string,
-                constraints: {
-                  format: /^a.*/
-                }
-              },
-              {
-                type: :string,
-                constraints: {
-                  format: /^b.*/
-                }
-              }
-            ]
+    schema = {
+      type: :array,
+      required: true,
+      ordered: true,
+      items: [
+        {
+          type: :string,
+          required: true,
+          constraints: {
+            format: /^a.*/
           }
-        ]
-      }
+        },
+        {
+          type: :array,
+          required: true,
+          ordered: true,
+          items: [
+            {
+              required: true,
+              type: :string,
+              constraints: {
+                format: /^a.*/
+              }
+            },
+            {
+              type: :string,
+              constraints: {
+                format: /^b.*/
+              }
+            }
+          ]
+        }
+      ]
+    }
 
-      context 'valid array' do
-        before(:all) { validator.validate_object([%w(b aa)], schema) }
+    context 'valid array' do
+      before(:all) { validator.validate_object(['a', %w(a b)], schema) }
 
-        it { expect(validator.errors).to be_empty }
-      end
-
-      context 'invalid array (one failure)' do
-        before(:all) { validator.validate_object([['b'], 'j'], schema) }
-
-        let(:error_msg) { 'It doesn\'t match with a given regular expression.' }
-        it { expect(validator.errors['self.1']).to include(error_msg) }
-      end
-
-      context 'invalid array (several failures)' do
-        before(:all) { validator.validate_object([{}, 'b', nil], schema) }
-
-        let(:error_msg1) { 'Hash is not allowed.' }
-        let(:error_msg2) { 'It doesn\'t match with a given regular expression.' }
-        let(:error_msg3) { 'It can\'t be nil.' }
-
-        it { expect(validator.errors['self.0']).to include(error_msg1) }
-        it { expect(validator.errors['self.1']).to include(error_msg2) }
-        it { expect(validator.errors['self.2']).to include(error_msg3) }
-      end
+      it { expect(validator.errors).to be_empty }
     end
 
-    context 'ordered' do
-      schema = {
-        type: :array,
-        required: true,
-        ordered: true,
-        items: [
-          {
-            type: :string,
-            constraints: {
-              format: /^a.*/
-            }
-          },
-          {
-            type: :array,
-            required: true,
-            ordered: true,
-            items: [
-              {
-                type: :string,
-                constraints: {
-                  format: /^a.*/
-                }
-              },
-              {
-                type: :string,
-                constraints: {
-                  format: /^b.*/
-                }
-              }
-            ]
-          }
-        ]
-      }
+    context 'invalid array (one failure)' do
+      before(:all) { validator.validate_object(['a', %w(b b)], schema) }
+      let(:error_msg) { 'It doesn\'t match with a given regular expression.' }
 
-      context 'valid array' do
-        before(:all) { validator.validate_object(['a', %w(a b)], schema) }
+      it { expect(validator.errors.count).to eq(1) }
+      it { expect(validator.errors['self.1.0']).to include(error_msg) }
+    end
 
-        it { expect(validator.errors).to be_empty }
-      end
+    context 'invalid array (several failures)' do
+      before(:all) { validator.validate_object([%w(b b), 'a'], schema) }
+      let(:error_msg1) { 'It is not an instance of String.' }
+      let(:error_msg2) { 'It doesn\'t match with a given regular expression.' }
+      let(:error_msg3) { 'It is not an instance of Array.' }
 
-      context 'invalid array (one failure)' do
-        before(:all) { validator.validate_object(['a', %w(b b)], schema) }
-        let(:error_msg) { 'It doesn\'t match with a given regular expression.' }
-
-        it { expect(validator.errors.count).to eq(1) }
-        it { expect(validator.errors['self.1.0']).to include(error_msg) }
-      end
-
-      context 'invalid array (several failures)' do
-        before(:all) { validator.validate_object([%w(b b), 'a'], schema) }
-        let(:error_msg1) { 'It is not an instance of String.' }
-        let(:error_msg2) { 'It doesn\'t match with a given regular expression.' }
-        let(:error_msg3) { 'It is not an instance of Array.' }
-
-        it { expect(validator.errors['self.0']).to include(error_msg1) }
-        it { expect(validator.errors['self.0']).to include(error_msg2) }
-        it { expect(validator.errors['self.1']).to include(error_msg3) }
-      end
+      it { expect(validator.errors['self.0']).to include(error_msg1) }
+      it { expect(validator.errors['self.0']).to include(error_msg2) }
+      it { expect(validator.errors['self.1']).to include(error_msg3) }
     end
   end
 end

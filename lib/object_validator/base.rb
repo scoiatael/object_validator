@@ -10,7 +10,7 @@ class ObjectValidator::Base
     validate: ->(_) { true }
   }.freeze
 
-  attr_reader :obj, :errors, :constraints, :required, :prefix, :custom_validate
+  attr_reader :obj, :errors, :constraints, :required, :prefix, :custom_validate, :options
   alias_method :required?, :required
 
   def initialize(**options)
@@ -31,12 +31,12 @@ class ObjectValidator::Base
 
   protected
 
-  def report_error(error)
-    errors[prefix] << error if required?
+  def report_error(error, force: false)
+    errors[prefix] << error if force || required?
   end
 
   def validate_instance_of!(klass)
-    report_error(ERRORS[:instance_of][klass]) unless obj.is_a? klass
+    report_error(ERRORS[:instance_of][klass], force: true) unless obj.is_a? klass
   end
 
   private
